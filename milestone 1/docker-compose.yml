@@ -1,0 +1,61 @@
+# docker-compose.yml
+# -------------------
+# This file tells Docker how to run the services we need for our IoT project.
+# We need TWO services:
+#   1. ZooKeeper → helper service that Kafka requires (like its "manager")
+#   2. Kafka → the message broker where producers send data and consumers read data
+#
+# When we run:  docker compose up
+# Docker will start both services automatically with the settings below.
+
+services:
+  # -------------------
+  # Service 1: ZooKeeper
+  # -------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1    # The official ZooKeeper image
+    container_name: zookeeper                 # Friendly name for the container
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181             # ZooKeeper listens on port 2181
+    ports:
+      - "2181:2181"                           # Make ZooKeeper accessible from host on port 2181
+
+  # -------------------
+  # Service 2: Kafka broker
+  # -------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1        # The official Kafka image
+    container_name: kafka                     # Friendly name for the container
+    depends_on:
+      - zookeeper                             # Start ZooKeeper first (Kafka needs it)
+
+    ports:
+      - "9092:9092"                           # Expose Kafka on port 9092 to host (where Python connects)
+
+    environment:
+      # Each Kafka broker in a cluster needs a unique ID (we only run one here)
+      KAFKA_BROKER_ID: 1
+
+      # Tell Kafka how to find ZooKeeper (using the container name and port)
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # Kafka stores consumer "read positions" in special topics. Because we only have
+      # ONE broker, replication factor must be 1 (can’t copy to other brokers).
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # --- Listener configuration ---
+      # Kafka uses "listeners" to define how apps connect.
+
+      # Internal name for this listener
+      KAFKA_INTER_BROKER_LISTENER_NAME: HOST
+
+      # Map the listener name (HOST) to PLAINTEXT (no encryption/authentication)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT
+
+      # Where Kafka listens INSIDE the container
+      # 0.0.0.0 means “listen on all network interfaces” on port 9092
+      KAFKA_LISTENERS: HOST://0.0.0.0:9092
+
+      # Where Kafka advertises itself to OUTSIDE clients (like your Python scripts)
+      # Here it says: connect to "localhost:9092"
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092

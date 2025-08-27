@@ -1,0 +1,95 @@
+How This IoT + Kafka Mini‑Project Works
+======================================
+
+Overview
+--------
+This project has three moving parts:
+  1) docker-compose.yml  → runs Kafka (and ZooKeeper) locally
+  2) generator.py         → simulates IoT sensor readings and *produces* JSON messages to Kafka; also appends the same rows to a CSV file
+  3) consumer.py          → *consumes* those JSON messages from Kafka and prints them
+
+High‑level data flow
+--------------------
+  [generator.py]  ──JSON──►  Kafka topic: 'iotsensors'  ──►  [consumer.py]
+       │
+       └── CSV append ──► sensors.csv (kept next to generator.py)
+
+File by file
+------------
+1) docker-compose.yml (runtime services)
+   • Purpose: starts the messaging infrastructure your code talks to.
+   • Typical services:
+     - ZooKeeper (coordination service used by Kafka)
+     - Kafka broker listening on localhost:9092 for host apps
+   • Why it matters: both generator.py and consumer.py are configured to reach Kafka at
+     'localhost:9092', so the compose stack must expose that port from the broker.
+
+2) generator.py (producer + CSV logger)
+   • Role: simulates an IoT device fleet (currently one device: 'dev-1') and publishes every
+     reading as a JSON message to Kafka topic 'iotsensors'. At the same time it appends the very
+     same row into 'sensors.csv' for easy offline inspection.
+   • Key settings:
+     - TOPIC = "iotsensors"
+     - DEVICES = ["dev-1"]    (you can add more IDs)
+     - INTERVAL_SEC = 1       (emit every second)
+     - DRAIN_PER_READ = 1     (battery drops each tick; clamped at 0%)
+   • Data schema produced per reading (JSON keys):
+       device_id, ts, temperature_c, humidity_pct, battery_pct, Alerts
+     - ts is human‑readable local time like "27/08/2025 - 21:05:11".
+     - When battery hits 0%, temperature_c and humidity_pct become null (None in Python).
+   • Alerts logic (string field with semicolon‑separated flags):
+     - Battery: "NO POWER" at 0%, "LOW BATTERY" below 10%.
+     - Temperature: "TEMP LOW" if < 21°C, "TEMP HIGH" if > 30°C (only when not null).
+     - Humidity: "HUMIDITY LOW" if < 35%, "HUMIDITY HIGH" if > 75% (only when not null).
+   • CSV logging:
+     - On first run, creates sensors.csv with a header row.
+     - Appends one line per reading and flushes/fsyncs so the file updates immediately.
+   • Kafka producing:
+     - Connects to localhost:9092 with a JSON serializer.
+     - Sends one message per device per tick, then flushes.
+
+3) consumer.py (streaming reader)
+   • Role: subscribes to topic 'iotsensors' and prints each received JSON message.
+   • Important settings:
+     - bootstrap_servers="localhost:9092"
+     - group_id="iot group readers"    (messages are tracked per consumer group)
+     - auto_offset_reset="latest"      (change to "earliest" if you want to read old data)
+     - value_deserializer = JSON decode of bytes → dict
+   • Loop: blocks waiting for messages and prints them as they arrive.
+
+End‑to‑end execution
+--------------------
+1) Start the services:
+     docker compose up -d
+   (Ensure the Kafka broker exposes localhost:9092 from the container.)
+2) In one terminal, start the producer:
+     python generator.py
+   You should see "[PRODUCED] {...}" lines and a growing sensors.csv next to the script.
+3) In a second terminal, start the consumer:
+     python consumer.py
+   You should see "[CONSUMED] {...}" matching what the producer emits.
+4) Stop with Ctrl+C in each terminal. Both scripts handle graceful shutdown.
+
+Notes & tips
+------------
+• Topic creation: Many local Kafka images allow auto‑creation when the producer first sends to
+  a new topic. If your broker doesn’t, create it manually named 'iotsensors' before running.
+• Nothing showing in the consumer?
+  - Make sure the broker is reachable at localhost:9092.
+  - Try setting auto_offset_reset="earliest" to read existing backlog.
+• Scaling devices: Add IDs to DEVICES in generator.py; each tick emits one message per device.
+• CSV location: sensors.csv is written in the same directory as generator.py.
+• Battery behaviour: Once battery_pct reaches 0%, temp/humidity become null and "NO POWER"
+  appears in Alerts; messages continue so you can observe the 'dead' device state.
+• Consumer groups: If you run multiple consumer.py instances with the same group_id, Kafka will
+  partition the work among them; with different group IDs each instance sees the full stream.
+• Windows vs. Docker Desktop: If your Kafka runs inside Docker and localhost:9092 isn’t
+  reachable from the host, check the container’s advertised listener and port mapping.
+
+Quick checklist
+---------------
+☐ 'docker compose up -d' is running Kafka and exposing localhost:9092
+☐ Topic 'iotsensors' exists (or auto‑create is enabled)
+☐ Run generator.py → see produced lines and sensors.csv growing
+☐ Run consumer.py  → see consumed lines
+
