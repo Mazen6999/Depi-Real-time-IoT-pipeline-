@@ -44,37 +44,37 @@ def simulate_reading(device_id, battery_pct):
         "temperature_c": temp,                                # temperature in Celsius
         "humidity_pct": hum,                                  # humidity percentage
         "battery_pct": battery_pct,                           # battery left
-        "Alerts": Alerts(battery_pct,temp,hum)                # warnings (battery low, etc.)
+        # "Alerts": Alerts(battery_pct,temp,hum)                # warnings (battery low, etc.)
     }
 
-def Alerts(battery_pct, temp, hum):
-    """
-    Create alert messages based on battery, temperature, and humidity.
-    Returns a single string with alerts separated by semicolons.
-    """
-    alerts = []
+# def Alerts(battery_pct, temp, hum):
+#     """
+#     Create alert messages based on battery, temperature, and humidity.
+#     Returns a single string with alerts separated by semicolons.
+#     """
+#     alerts = []
 
-    # Battery checks
-    if battery_pct == 0:
-        alerts.append("NO POWER")            # device is completely dead
-    elif battery_pct < 10:
-        alerts.append("LOW BATTERY")
+#     # Battery checks
+#     if battery_pct == 0:
+#         alerts.append("NO POWER")            # device is completely dead
+#     elif battery_pct < 10:
+#         alerts.append("LOW BATTERY")
 
-    # Temperature checks (only if we have a reading)
-    if temp is not None:
-        if temp < 21:
-            alerts.append("TEMP LOW")
-        elif temp > 30:
-            alerts.append("TEMP HIGH")
+#     # Temperature checks (only if we have a reading)
+#     if temp is not None:
+#         if temp < 21:
+#             alerts.append("TEMP LOW")
+#         elif temp > 30:
+#             alerts.append("TEMP HIGH")
 
-    # Humidity checks (only if we have a reading)
-    if hum is not None:
-        if hum < 35:
-            alerts.append("HUMIDITY LOW")
-        elif hum > 75:
-            alerts.append("HUMIDITY HIGH")
+#     # Humidity checks (only if we have a reading)
+#     if hum is not None:
+#         if hum < 35:
+#             alerts.append("HUMIDITY LOW")
+#         elif hum > 75:
+#             alerts.append("HUMIDITY HIGH")
 
-    return " ; ".join(alerts)   # join all alerts in one string
+#     return " ; ".join(alerts)   # join all alerts in one string
 
 
 def main():
@@ -82,7 +82,7 @@ def main():
     if not os.path.exists(CSV_PATH):
         # If file doesn’t exist, create it and write the header row
         open(file=CSV_PATH, mode = "w", encoding="utf-8").write(
-            "device_id,ts,temperature_c,humidity_pct,battery_pct,Alerts\n"
+            "device_id,ts,temperature_c,humidity_pct,battery_pct\n"
         )
 
     # Open CSV file in append mode so new readings are added at the bottom
@@ -112,7 +112,7 @@ def main():
                 # --- Save to CSV file ---
                 csv_file.write(
                     f"{msg['device_id']},{msg['ts']},{msg['temperature_c']},"
-                    f"{msg['humidity_pct']},{msg['battery_pct']},{msg['Alerts']}\n"
+                    f"{msg['humidity_pct']},{msg['battery_pct']}\n"
                 )
                 csv_file.flush()                # push to OS buffer
                 os.fsync(csv_file.fileno())     # force write to disk
