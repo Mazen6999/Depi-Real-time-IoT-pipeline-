@@ -36,8 +36,8 @@ def simulate_reading(device_id, battery_pct):
     If battery is 0, no temperature/humidity data will be generated (set to None).
     Returns a dictionary representing the data.
     """
-    temp = round(random.uniform(18.0, 36.0), 2) if battery_pct > 0 else None
-    hum  = round(random.uniform(20.0, 90.0), 2) if battery_pct > 0 else None
+    temp = round(random.uniform(18.0, 36.0), 2) if battery_pct > 0 else ''
+    hum  = round(random.uniform(20.0, 90.0), 2) if battery_pct > 0 else ''
     return {
         "device_id": device_id,                               # which device sent it
         "ts": datetime.now().strftime("%d/%m/%Y - %H:%M:%S"), # timestamp in local time
