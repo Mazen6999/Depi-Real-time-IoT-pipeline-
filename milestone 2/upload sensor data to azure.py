@@ -11,8 +11,10 @@ CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 # The name of the container you created in Azure
 CONTAINER_NAME = "raw-data" 
 
-# The local file you want to upload
-LOCAL_FILE_PATH = r'C:\Users\Lenovo\Desktop\DEPI Technical\portofolio\Depi Final Project\Depi-Real-time-IoT-pipeline-\milestone 2\milestone 1\sensors.csv'
+# Get the current script directory to create a relative path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# The file you want to upload
+LOCAL_FILE_PATH = os.path.join(BASE_DIR, 'milestone 1', 'sensors.csv')
 
 # The name you want the file to have in Azure
 BLOB_NAME = "sensors.csv" 
