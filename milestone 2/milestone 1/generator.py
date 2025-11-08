@@ -47,34 +47,6 @@ def simulate_reading(device_id, battery_pct):
         # "Alerts": Alerts(battery_pct,temp,hum)                # warnings (battery low, etc.)
     }
 
-# def Alerts(battery_pct, temp, hum):
-#     """
-#     Create alert messages based on battery, temperature, and humidity.
-#     Returns a single string with alerts separated by semicolons.
-#     """
-#     alerts = []
-
-#     # Battery checks
-#     if battery_pct == 0:
-#         alerts.append("NO POWER")            # device is completely dead
-#     elif battery_pct < 10:
-#         alerts.append("LOW BATTERY")
-
-#     # Temperature checks (only if we have a reading)
-#     if temp is not None:
-#         if temp < 21:
-#             alerts.append("TEMP LOW")
-#         elif temp > 30:
-#             alerts.append("TEMP HIGH")
-
-#     # Humidity checks (only if we have a reading)
-#     if hum is not None:
-#         if hum < 35:
-#             alerts.append("HUMIDITY LOW")
-#         elif hum > 75:
-#             alerts.append("HUMIDITY HIGH")
-
-#     return " ; ".join(alerts)   # join all alerts in one string
 
 
 def main():
