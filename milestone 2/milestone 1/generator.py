@@ -37,7 +37,7 @@ def simulate_reading(device_id, battery_pct):
     hum  = round(random.uniform(20.0, 90.0), 2) if battery_pct > 0 else ''
     return {
         "device_id": device_id,
-        "ts": datetime.now().strftime("%d/%m/%Y - %H:%M:%S"), 
+        "ts": datetime.now().isoformat(), 
         "temperature_c": temp,
         "humidity_pct": hum,
         "battery_pct": battery_pct,
