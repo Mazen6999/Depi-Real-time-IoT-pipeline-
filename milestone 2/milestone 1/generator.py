@@ -21,9 +21,9 @@ EVENTHUB_NAME = "iot-stream"  # The hub name you created
 
 # --- General Simulation Config ---
 DEVICES = ["dev-1"]
-INTERVAL_SEC = 1
+INTERVAL_SEC = 5
 DRAIN_PER_READ = 1
-BATTERIES = {dev: random.randint(10, 20) for dev in DEVICES}
+BATTERIES = {dev: random.randint(15, 20) for dev in DEVICES}
 CSV_PATH = os.path.join(os.path.dirname(__file__), "sensors.csv") 
 
 
