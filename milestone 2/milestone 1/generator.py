@@ -1,12 +1,12 @@
-# generator.py (Sends to BOTH Kafka + Azure Event Hub + CSV)
+# generator.py (Sends to Kafka + Event Hub + CSV, and uploads CSV on exit)
 # --------------------------------------------------
 
 import os, json, time, random
 from datetime import datetime
-from kafka import KafkaProducer             # KAFKA PRODUCER (Milestone 1)
-
-from dotenv import load_dotenv            # For loading secrets
-from azure.eventhub import EventHubProducerClient, EventData  # AZURE PRODUCER (Milestone 3)
+from kafka import KafkaProducer
+from dotenv import load_dotenv
+from azure.eventhub import EventHubProducerClient, EventData
+from azure.storage.blob import BlobServiceClient
 
 # --- Load Environment Variables ---
 load_dotenv()
@@ -17,7 +17,12 @@ KAFKA_BOOTSTRAP_SERVER = "localhost:9092"
 
 # --- Azure Event Hub Configuration (Milestone 3) ---
 EVENTHUB_CONNECTION_STRING = os.getenv("EVENTHUB_CONNECTION_STRING")
-EVENTHUB_NAME = "iot-stream"  # The hub name you created
+EVENTHUB_NAME = "iot-stream"
+
+# --- Azure Blob Storage Configuration (Milestone 2) ---
+AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+BLOB_CONTAINER_NAME = "raw-data"
+BLOB_NAME = "sensors.csv"
 
 # --- General Simulation Config ---
 DEVICES = ["dev-1"]
@@ -26,18 +31,12 @@ DRAIN_PER_READ = 1
 BATTERIES = {dev: random.randint(90, 100) for dev in DEVICES}
 CSV_PATH = os.path.join(os.path.dirname(__file__), "sensors.csv") 
 
-
 def simulate_reading(device_id, battery_pct):
-    """
-    Simulate one sensor reading for a device.
-    If battery is 0, no temperature/humidity data will be generated (set to '').
-    Returns a dictionary representing the data.
-    """
     temp = round(random.uniform(18.0, 36.0), 2) if battery_pct > 0 else ''
     hum  = round(random.uniform(20.0, 90.0), 2) if battery_pct > 0 else ''
     return {
         "device_id": device_id,
-        "ts": datetime.now().isoformat(), 
+        "ts": datetime.now().isoformat(), # Standard ISO format
         "temperature_c": temp,
         "humidity_pct": hum,
         "battery_pct": battery_pct,
@@ -60,25 +59,22 @@ def main():
     # 3. Create the Event Hub producer (Milestone 3)
     if not EVENTHUB_CONNECTION_STRING:
         print("[ERROR] EVENTHUB_CONNECTION_STRING environment variable not set.")
-        print("Please add it to your .env file.")
-        return
-        
+        return # <-- This 'return' is OK because it's in the 'main' function, not 'finally'
+    
     EventHub_Producer = EventHubProducerClient.from_connection_string(
         conn_str=EVENTHUB_CONNECTION_STRING,
         eventhub_name=EVENTHUB_NAME
     )
     
-    print(f"[INFO] Producing to Kafka: {KAFKA_TOPIC} @ {KAFKA_BOOTSTRAP_SERVER}")
+    print(f"[INFO] Producing to Kafka: {KAFKA_TOPIC}")
     print(f"[INFO] Producing to Event Hub: {EVENTHUB_NAME}")
-    print(f"[INFO] CSV: {CSV_PATH} | Devices: {DEVICES}")
+    print("[INFO] Press Ctrl+C to stop...")
 
     try:
         while True:
             for device in DEVICES:
                 BATTERIES[device] = max(0, BATTERIES[device] - DRAIN_PER_READ)        
                 msg = simulate_reading(device, BATTERIES[device])
-                
-                # Convert to JSON string once
                 json_payload = json.dumps(msg)
 
                 # --- Send to Kafka (Milestone 1) ---
@@ -101,7 +97,6 @@ def main():
                     f"{msg['humidity_pct']},{msg['battery_pct']}\n"
                 )
                 csv_file.flush()
-                os.fsync(csv_file.fileno())
                 
                 print("[PRODUCED]", msg)
 
@@ -111,11 +106,30 @@ def main():
     except KeyboardInterrupt:
         print("\n[INFO] Stopping producers...")
     finally:
-        # Clean shutdown for BOTH producers
+        # --- Clean shutdown for ALL services ---
         print("Closing producers...")
         Kafka_Producer.close()
         EventHub_Producer.close()
         csv_file.close()
+
+        # --- UPLOAD TO BLOB STORAGE (Milestone 2) ---
+        print(f"[INFO] Uploading '{CSV_PATH}' to Azure Blob Storage...")
+        
+        # *** THIS IS THE FIX ***
+        # We just check for the string and only try to upload if it exists.
+        if AZURE_STORAGE_CONNECTION_STRING:
+            try:
+                blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
+                blob_client = blob_service_client.get_blob_client(container=BLOB_CONTAINER_NAME, blob=BLOB_NAME)
+                
+                with open(CSV_PATH, "rb") as data:
+                    blob_client.upload_blob(data, overwrite=True)
+                
+                print("[INFO] Upload complete!")
+            except Exception as e:
+                print(f"[ERROR uploading to Blob] {e}")
+        else:
+            print(f"[ERROR] AZURE_STORAGE_CONNECTION_STRING not set. Cannot upload.")
 
 
 # Run the main loop only if script is executed directly
@@ -124,4 +138,4 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(f"[Main ERROR] {e}")
-    input("Press Enter to exit...")
+    input("\nPress Enter to exit...")
